@@ -47,7 +47,9 @@ async function testContract() {
         
         // Testar geração de energia (apenas owner pode fazer isso)
         console.log("\nTestando geração de energia...");
-        const tx = await contract.generateEnergy(1000);
+        const userAddress = process.env.ADDRESS_TESTE; 
+        const amount = 9000000000000;
+        const tx = await contract.generateEnergy(userAddress, amount);
         await tx.wait();
         console.log("Energia gerada com sucesso!");
         
