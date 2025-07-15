@@ -27,14 +27,14 @@ contract EnergyCredits is ERC20, Ownable {
     // Função para registrar a geração de energia
 function generateEnergy(address user, uint256 amount) external onlyOwner {
     require(user != address(0), "Endereco invalido");
-    require(amount > 0, "A quantidade deve ser maior que zero");
-    // Registrar a geração de energia
+        require(amount > 0, "A quantidade deve ser maior que zero");
+        // Registrar a geração de energia
     energyGenerations[generationCount] = EnergyGeneration(user, amount, block.timestamp);
     emit EnergyGenerated(user, amount, block.timestamp);
-    // Emitir tokens equivalentes à quantidade de energia gerada
+        // Emitir tokens equivalentes à quantidade de energia gerada
     _mint(user, amount);
-    generationCount++;
-}
+        generationCount++;
+    }
 
     // Função para transferir créditos de energia entre usuários
     function transferCredits(address to, uint256 amount) external {
