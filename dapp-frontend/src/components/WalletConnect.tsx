@@ -22,10 +22,18 @@ export default function WalletConnect({ onConnect }: { onConnect?: (address: str
     }
     try {
       const accounts = await (window as any).ethereum.request({ method: "eth_requestAccounts" });
-      setAddress(accounts[0]);
-      if (onConnect) onConnect(accounts[0]);
+      if (accounts && accounts.length > 0) {
+        setAddress(accounts[0]);
+        if (onConnect) onConnect(accounts[0]);
+      } else {
+        setError("Nenhuma conta encontrada no MetaMask.");
+      }
     } catch (err: any) {
-      setError("Erro ao conectar: " + (err.message || err));
+      if (err.code === 4001) {
+        setError("Conexão cancelada pelo usuário.");
+      } else {
+        setError("Erro ao conectar: " + (err.message || err));
+      }
     }
   };
 

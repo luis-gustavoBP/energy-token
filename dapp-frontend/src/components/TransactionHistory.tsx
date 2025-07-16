@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import { ethers, Provider } from "ethers";
+import { EnergyCreditsContract } from "../types/contract";
+import LoadingSpinner from "./LoadingSpinner";
 
 interface Props {
-  contract: any;
+  contract: EnergyCreditsContract;
   address: string;
   provider: Provider;
 }
@@ -32,11 +34,14 @@ export default function TransactionHistory({ contract, address, provider }: Prop
         // Busca eventos Transfer envolvendo a carteira conectada
         const filterIn = contract.filters.Transfer(null, address);
         const filterOut = contract.filters.Transfer(address, null);
+        const maxBlocks = 1000;
         const [inEvents, outEvents] = await Promise.all([
-          contract.queryFilter(filterIn, -10000), // últimos 10k blocos
-          contract.queryFilter(filterOut, -10000),
+          contract.queryFilter(filterIn, -maxBlocks),
+          contract.queryFilter(filterOut, -maxBlocks),
         ]);
-        const all = [...inEvents, ...outEvents].sort((a, b) => (b.blockNumber || 0) - (a.blockNumber || 0));
+        const all = [...inEvents, ...outEvents]
+          .sort((a, b) => (b.blockNumber || 0) - (a.blockNumber || 0))
+          .slice(0, 20); // só os 20 mais recentes
         // Busca timestamp dos blocos usando provider de leitura
         const items: TxItem[] = await Promise.all(
           all.map(async (ev: any) => {
@@ -53,7 +58,13 @@ export default function TransactionHistory({ contract, address, provider }: Prop
         );
         if (!ignore) setTxs(items);
       } catch (err: any) {
-        if (!ignore) setError("Erro ao buscar transações: " + (err.message || err));
+        if (!ignore) {
+          if (err.message && err.message.includes("Too Many Requests")) {
+            setError("Limite de requisições atingido no provider. Aguarde alguns minutos ou troque de RPC.");
+          } else {
+            setError("Erro ao buscar transações: " + (err.message || err));
+          }
+        }
       }
       setLoading(false);
     }
@@ -66,8 +77,8 @@ export default function TransactionHistory({ contract, address, provider }: Prop
   return (
     <div className="w-full bg-gray-50 dark:bg-gray-900 p-4 rounded-2xl shadow mt-4">
       <div className="font-semibold mb-2">Histórico de Transações (ECRD)</div>
-      {loading && <div className="text-xs text-gray-500">Carregando...</div>}
-      {error && <div className="text-red-500 text-xs">{error}</div>}
+      {loading && <LoadingSpinner size="sm" text="Carregando..." />}
+      {error && <div className="text-red-500 text-xs mb-2">{error}</div>}
       <div className="flex flex-col gap-2 mt-2">
         {txs.length === 0 && !loading && <div className="text-xs text-gray-400">Nenhuma transação encontrada.</div>}
         {txs.map((tx, idx) => (

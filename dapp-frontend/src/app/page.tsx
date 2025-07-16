@@ -1,31 +1,38 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { ethers } from "ethers";
 import WalletConnect from "../components/WalletConnect";
 import Balance from "../components/Balance";
-import TransferForm from "../components/TransferForm";
+import SmartTransferForm from "../components/SmartTransferForm";
 import GenerateForm from "../components/GenerateForm";
 import GenerationHistory from "../components/GenerationHistory";
 import TransactionHistory from "../components/TransactionHistory";
 import BurnForm from "../components/BurnForm";
+import NetworkCheck from "../components/NetworkCheck";
+import Dashboard from "../components/Dashboard";
+import { NotificationProvider, NotificationHistory } from "../components/NotificationSystem";
 import Image from "next/image";
+import { EnergyCreditsContract } from "../types/contract";
 
 // ABI e endereço do contrato
 import CONTRACT_ABI from "../../build/contracts/EnergyCredits.json";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 
-export default function Home() {
+function HomeContent() {
   const [address, setAddress] = useState<string>("");
-  const [contract, setContract] = useState<any>(null);
+  const [contract, setContract] = useState<EnergyCreditsContract | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [ownerAddress, setOwnerAddress] = useState<string>("");
+  const [balance, setBalance] = useState<string>("-");
 
   // Instancia provider de leitura (Infura)
   const provider = new ethers.JsonRpcProvider(`https://sepolia.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_PROJECT_ID}`);
 
-  // Instancia contrato para leitura
-  const contractRead = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI.abi, provider);
+  // Instancia contrato para leitura usando useMemo para evitar recriação
+  const contractRead = useMemo(() => {
+    return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI.abi, provider) as EnergyCreditsContract;
+  }, [provider]);
 
   // Atualiza contrato de escrita ao conectar carteira
   const handleConnect = useCallback(async (userAddress: string) => {
@@ -33,7 +40,7 @@ export default function Home() {
     if (userAddress && (window as any).ethereum) {
       const web3Provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await web3Provider.getSigner();
-      const contractWrite = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI.abi, signer);
+      const contractWrite = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI.abi, signer) as EnergyCreditsContract;
       setContract(contractWrite);
       // Descobre owner
       try {
@@ -60,7 +67,7 @@ export default function Home() {
       }
     }
     fetchOwner();
-  }, [CONTRACT_ADDRESS]);
+  }, [contractRead]);
 
   return (
     <div className="flex flex-col gap-8 w-full">
@@ -75,23 +82,51 @@ export default function Home() {
         />
       </div>
       <h1 className="text-3xl font-bold text-center mb-2">EnergyCredits DApp</h1>
+      
+      <NetworkCheck />
+      
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between w-full">
-        <WalletConnect onConnect={handleConnect} />
-        {address && contract && <Balance address={address} contract={contract} />}
+        <div className="flex items-center gap-4">
+          {/* <WalletConnect onConnect={handleConnect} /> */}
+          {/* <NotificationHistory /> */}
+        </div>
+        {address && contract && <Balance address={address} contract={contract} onBalanceChange={setBalance} />}
       </div>
+      
       {address && contract && (
         <>
-          <TransferForm contract={contract} address={address} />
-          <GenerateForm contract={contract} address={address} isOwner={isOwner} />
-          <BurnForm contract={contract} address={address} isOwner={isOwner} />
+          <Dashboard contract={contract} address={address} balance={balance} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <SmartTransferForm contract={contract} address={address} balance={balance} />
+            <div className="space-y-6">
+              <GenerateForm contract={contract} address={address} isOwner={isOwner} />
+              <BurnForm contract={contract} address={address} isOwner={isOwner} />
+            </div>
+          </div>
           <GenerationHistory contract={contract} isOwner={isOwner} address={address} />
           <TransactionHistory contract={contract} address={address} provider={provider} />
         </>
       )}
       {!address && (
-        <div className="text-center text-gray-500 mt-8">Conecte sua carteira para acessar as funcionalidades.</div>
+        <div className="flex justify-center items-center min-h-[200px]">
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex items-center gap-3">
+              <WalletConnect onConnect={handleConnect} />
+              <NotificationHistory />
+            </div>
+            <div className="text-center text-gray-500 mt-4">Conecte sua carteira para acessar as funcionalidades.</div>
+          </div>
+        </div>
       )}
       <div className="text-xs text-center text-gray-400 mt-8">Contrato: <span className="font-mono">{CONTRACT_ADDRESS}</span><br/>Owner: <span className="font-mono">{ownerAddress}</span></div>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <NotificationProvider>
+      <HomeContent />
+    </NotificationProvider>
   );
 }

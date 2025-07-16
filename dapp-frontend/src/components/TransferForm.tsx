@@ -1,8 +1,11 @@
 "use client";
 import { useState } from "react";
 import { ethers } from "ethers";
+import { EnergyCreditsContract } from "../types/contract";
+import { parseTransactionError } from "../utils/errors";
+import LoadingSpinner from "./LoadingSpinner";
 
-export default function TransferForm({ contract, address }: { contract: any; address: string }) {
+export default function TransferForm({ contract, address }: { contract: EnergyCreditsContract; address: string }) {
   const [to, setTo] = useState("");
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
@@ -12,25 +15,39 @@ export default function TransferForm({ contract, address }: { contract: any; add
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(""); setSuccess("");
+    
     if (!ethers.isAddress(to)) {
       setError("Endereço de destino inválido.");
       return;
     }
+    
+    if (to.toLowerCase() === address.toLowerCase()) {
+      setError("Não é possível transferir para o próprio endereço.");
+      return;
+    }
+    
     let value;
     try {
       value = ethers.parseUnits(amount, 18);
+      if (value <= BigInt(0)) {
+        setError("A quantidade deve ser maior que zero.");
+        return;
+      }
     } catch {
       setError("Valor inválido.");
       return;
     }
+    
     setLoading(true);
     try {
       const tx = await contract.transfer(to, value);
+      setSuccess("Transação enviada! Aguardando confirmação...");
       await tx.wait();
-      setSuccess("Transferência realizada!");
+      setSuccess("Transferência realizada com sucesso!");
       setTo(""); setAmount("");
     } catch (err: any) {
-      setError("Erro: " + (err.reason || err.message || err));
+      const parsedError = parseTransactionError(err);
+      setError(parsedError.userMessage);
     }
     setLoading(false);
   };
@@ -40,7 +57,9 @@ export default function TransferForm({ contract, address }: { contract: any; add
       <div className="font-semibold mb-2">Transferir ECRD</div>
       <input type="text" placeholder="Endereço de destino" value={to} onChange={e => setTo(e.target.value)} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-black" required />
       <input type="number" placeholder="Quantidade" value={amount} onChange={e => setAmount(e.target.value)} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-black" required min="0" step="any" />
-      <button type="submit" disabled={loading} className="mt-2 px-4 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black border border-black dark:border-white hover:opacity-80 transition disabled:opacity-50">{loading ? "Enviando..." : "Transferir"}</button>
+      <button type="submit" disabled={loading} className="mt-2 px-4 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black border border-black dark:border-white hover:opacity-80 transition disabled:opacity-50">
+        {loading ? <LoadingSpinner size="sm" text="Enviando..." /> : "Transferir"}
+      </button>
       {error && <div className="text-red-500 text-xs mt-2">{error}</div>}
       {success && <div className="text-green-600 text-xs mt-2">{success}</div>}
     </form>
