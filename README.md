@@ -209,4 +209,4 @@ Se você encontrar algum problema ou tiver dúvidas:
 
 ---
 
-**Desenvolvido com ❤️ para o futuro da energia descentralizada** 
+**Desenvolvendo o futuro da energia descentralizada** 
