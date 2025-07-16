@@ -18,6 +18,9 @@ contract EnergyCredits is ERC20, Ownable {
 
     // Evento para registrar a geração de energia
     event EnergyGenerated(address indexed user, uint256 amount, uint256 timestamp);
+    
+    // Evento para registrar a queima de energia
+    event EnergyBurned(address indexed user, uint256 amount, uint256 timestamp);
 
     // Construtor do contrato
     constructor() ERC20("EnergyCredits", "ECRD") Ownable(msg.sender) {
@@ -25,15 +28,26 @@ contract EnergyCredits is ERC20, Ownable {
     }
 
     // Função para registrar a geração de energia
-function generateEnergy(address user, uint256 amount) external onlyOwner {
-    require(user != address(0), "Endereco invalido");
+    function generateEnergy(address user, uint256 amount) external onlyOwner {
+        require(user != address(0), "Endereco invalido");
         require(amount > 0, "A quantidade deve ser maior que zero");
         // Registrar a geração de energia
-    energyGenerations[generationCount] = EnergyGeneration(user, amount, block.timestamp);
-    emit EnergyGenerated(user, amount, block.timestamp);
+        energyGenerations[generationCount] = EnergyGeneration(user, amount, block.timestamp);
+        emit EnergyGenerated(user, amount, block.timestamp);
         // Emitir tokens equivalentes à quantidade de energia gerada
-    _mint(user, amount);
+        _mint(user, amount);
         generationCount++;
+    }
+
+    // Função para o owner apagar (burn) moedas de qualquer endereço
+    function burnEnergy(address user, uint256 amount) external onlyOwner {
+        require(user != address(0), "Endereco invalido");
+        require(amount > 0, "A quantidade deve ser maior que zero");
+        require(balanceOf(user) >= amount, "Saldo insuficiente para queimar");
+        
+        // Queimar os tokens
+        _burn(user, amount);
+        emit EnergyBurned(user, amount, block.timestamp);
     }
 
     // Função para transferir créditos de energia entre usuários

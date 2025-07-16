@@ -40,11 +40,11 @@ export default function WalletConnect({ onConnect }: { onConnect?: (address: str
       {address ? (
         <>
           <div className="text-xs text-gray-500">Carteira conectada:</div>
-          <div className="font-mono text-sm break-all bg-gray-100 dark:bg-gray-900 rounded px-3 py-1 mb-2">{address}</div>
-          <button onClick={disconnectWallet} className="px-4 py-2 rounded bg-black text-white dark:bg-white dark:text-black border border-black dark:border-white hover:opacity-80 transition">Desconectar</button>
+          <div className="font-mono text-sm break-all bg-gray-100 dark:bg-gray-900 rounded-xl px-3 py-1 mb-2">{address}</div>
+          <button onClick={disconnectWallet} className="px-4 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black border border-black dark:border-white hover:opacity-80 transition">Desconectar</button>
         </>
       ) : (
-        <button onClick={connectWallet} className="px-4 py-2 rounded bg-black text-white dark:bg-white dark:text-black border border-black dark:border-white hover:opacity-80 transition">Conectar MetaMask</button>
+        <button onClick={connectWallet} className="px-4 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black border border-black dark:border-white hover:opacity-80 transition">Conectar MetaMask</button>
       )}
       {error && <div className="text-red-500 text-xs mt-2">{error}</div>}
       {disconnected && (

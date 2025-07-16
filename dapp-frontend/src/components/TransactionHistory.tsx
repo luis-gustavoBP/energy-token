@@ -47,7 +47,7 @@ export default function TransactionHistory({ contract, address, provider }: Prop
               to: ev.args[1],
               value: ethers.formatUnits(ev.args[2], 18),
               direction: ev.args[0].toLowerCase() === address.toLowerCase() ? "out" : "in",
-              timestamp: block ? block.timestamp : 0, 
+              timestamp: block ? block.timestamp : 0,
             };
           })
         );
@@ -64,14 +64,14 @@ export default function TransactionHistory({ contract, address, provider }: Prop
   if (!contract || !address) return null;
 
   return (
-    <div className="w-full bg-gray-50 dark:bg-gray-900 p-4 rounded shadow mt-4">
+    <div className="w-full bg-gray-50 dark:bg-gray-900 p-4 rounded-2xl shadow mt-4">
       <div className="font-semibold mb-2">Histórico de Transações (ECRD)</div>
       {loading && <div className="text-xs text-gray-500">Carregando...</div>}
       {error && <div className="text-red-500 text-xs">{error}</div>}
       <div className="flex flex-col gap-2 mt-2">
         {txs.length === 0 && !loading && <div className="text-xs text-gray-400">Nenhuma transação encontrada.</div>}
         {txs.map((tx, idx) => (
-          <div key={tx.hash + idx} className={`flex flex-col md:flex-row md:items-center justify-between border rounded px-3 py-2 ${tx.direction === "in" ? "border-green-400" : "border-red-400"} bg-white dark:bg-black`}>
+          <div key={tx.hash + idx} className={`flex flex-col md:flex-row md:items-center justify-between border rounded-xl px-3 py-2 ${tx.direction === "in" ? "border-green-400" : "border-red-400"} bg-white dark:bg-black`}>
             <div className="font-mono text-xs break-all">
               {tx.direction === "in" ? "Recebido de" : "Enviado para"}: {tx.direction === "in" ? tx.from : tx.to}
             </div>

@@ -7,6 +7,7 @@ import TransferForm from "../components/TransferForm";
 import GenerateForm from "../components/GenerateForm";
 import GenerationHistory from "../components/GenerationHistory";
 import TransactionHistory from "../components/TransactionHistory";
+import BurnForm from "../components/BurnForm";
 import Image from "next/image";
 
 // ABI e endereço do contrato
@@ -82,6 +83,7 @@ export default function Home() {
         <>
           <TransferForm contract={contract} address={address} />
           <GenerateForm contract={contract} address={address} isOwner={isOwner} />
+          <BurnForm contract={contract} address={address} isOwner={isOwner} />
           <GenerationHistory contract={contract} isOwner={isOwner} address={address} />
           <TransactionHistory contract={contract} address={address} provider={provider} />
         </>

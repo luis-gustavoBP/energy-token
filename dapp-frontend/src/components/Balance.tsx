@@ -27,7 +27,7 @@ export default function Balance({ address, contract }: { address: string; contra
         <Image src="/ercdToken.png" alt="ECRD" width={48} height={48} />
         Saldo de ECRD
       </div>
-      <div className="font-mono text-2xl bg-gray-100 dark:bg-gray-900 rounded px-4 py-2 mt-1">{balance}</div>
+      <div className="font-mono text-2xl bg-gray-100 dark:bg-gray-900 rounded-xl px-4 py-2 mt-1">{balance}</div>
     </div>
   );
 } 
