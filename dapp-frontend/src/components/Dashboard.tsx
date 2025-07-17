@@ -3,6 +3,8 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { ethers } from "ethers";
 import { EnergyCreditsContract } from "../types/contract";
 import Image from "next/image";
+import { ResponsiveBar } from '@nivo/bar';
+import { useTheme } from 'next-themes';
 
 interface DashboardProps {
   contract: EnergyCreditsContract;
@@ -22,7 +24,12 @@ interface DailyActivity {
   value: number;
 }
 
-const PERIOD_OPTIONS = [7, 14, 30];
+// Adicionar opções de período
+const PERIOD_OPTIONS = [
+  { label: '24h', value: '24h' },
+  { label: '7 dias', value: '7d' },
+  { label: '1 mês', value: '30d' }
+];
 
 export default function Dashboard({ contract, address, balance }: DashboardProps) {
   const [stats, setStats] = useState<TransactionStats>({
@@ -32,12 +39,18 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
     lastTransaction: ""
   });
   const [loading, setLoading] = useState(false);
-  const [period, setPeriod] = useState(7);
+  const [period, setPeriod] = useState<'24h' | '7d' | '30d'>('24h');
   const [activity, setActivity] = useState<DailyActivity[]>([]);
   const [error, setError] = useState<string>("");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const { resolvedTheme } = useTheme();
+  const barColor = resolvedTheme === 'dark' ? '#4ade80' : '#16a34a';
 
-  // Buscar estatísticas de transações e atividade diária
+  // Detectar o tema (dark/light) para definir a cor da barra
+  // const isDark = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  // const barColor = isDark ? '#4ade80' : '#16a34a';
+
+  // Buscar estatísticas de transações e atividade por período
   const fetchStats = async () => {
     if (!contract || !address) {
       setError("Contrato ou endereço não definido.");
@@ -49,7 +62,7 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
       // Buscar eventos Transfer
       const filterIn = contract.filters.Transfer(null, address);
       const filterOut = contract.filters.Transfer(address, null);
-      const maxBlocks = 1000; // ou menos, se necessário
+      const maxBlocks = 2000; // aumentar para pegar mais eventos se necessário
       const [inEvents, outEvents] = await Promise.all([
         contract.queryFilter(filterIn, -maxBlocks),
         contract.queryFilter(filterOut, -maxBlocks),
@@ -59,16 +72,32 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
       let totalReceived = 0;
       const all = [...inEvents, ...outEvents]
         .sort((a, b) => (b.blockNumber || 0) - (a.blockNumber || 0))
-        .slice(0, 20); // só os 20 mais recentes
+        .slice(0, period === '24h' ? 50 : 300); // mais eventos para períodos maiores
 
-      // Mapear eventos por dia
+      // Agrupar eventos conforme o período
       const now = new Date();
-      const days: { [date: string]: number } = {};
-      for (let i = 0; i < period; i++) {
-        const d = new Date(now);
-        d.setDate(now.getDate() - (period - 1 - i));
-        const key = d.toISOString().slice(0, 10);
-        days[key] = 0;
+      let activityMap: { [key: string]: number } = {};
+      let labels: string[] = [];
+      if (period === '24h') {
+        // 24h: por hora (horário de Brasília)
+        for (let i = 0; i < 24; i++) {
+          const d = new Date(now);
+          d.setHours(now.getHours() - (23 - i), 0, 0, 0);
+          const brDate = new Date(d.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+          const key = brDate.toISOString().slice(0, 13); // yyyy-mm-ddTHH
+          activityMap[key] = 0;
+        }
+      } else {
+        // 7d ou 30d: por dia (horário de Brasília)
+        const days = period === '7d' ? 7 : 30;
+        for (let i = 0; i < days; i++) {
+          const d = new Date(now);
+          d.setDate(now.getDate() - (days - 1 - i));
+          d.setHours(0, 0, 0, 0);
+          const brDate = new Date(d.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+          const key = brDate.toISOString().slice(0, 10); // yyyy-mm-dd
+          activityMap[key] = 0;
+        }
       }
 
       // Obter provider corretamente (ethers v6)
@@ -77,10 +106,17 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
         const args = (event as any).args;
         const blockNumber = (event as any).blockNumber;
         const block = await provider.getBlock(blockNumber);
-        const date = new Date(block.timestamp * 1000).toISOString().slice(0, 10);
+        // Converter timestamp do bloco para horário de Brasília
+        const brDate = new Date(new Date(block.timestamp * 1000).toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+        let key = '';
+        if (period === '24h') {
+          key = brDate.toISOString().slice(0, 13); // yyyy-mm-ddTHH
+        } else {
+          key = brDate.toISOString().slice(0, 10); // yyyy-mm-dd
+        }
         const value = Number(ethers.formatUnits(args[2], 18));
-        if (days[date] !== undefined) {
-          days[date] += value;
+        if (activityMap[key] !== undefined) {
+          activityMap[key] += value;
         }
         if (args[0].toLowerCase() === address.toLowerCase()) {
           totalSent += value;
@@ -95,7 +131,8 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
         transactionCount: all.length,
         lastTransaction: all.length > 0 ? new Date().toLocaleDateString() : "Nunca"
       });
-      setActivity(Object.entries(days).map(([date, value]) => ({ date, value })));
+      setActivity(Object.entries(activityMap).map(([date, value]) => ({ date, value })));
+      console.log("activity", Object.entries(activityMap));
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
       console.error("Erro ao buscar estatísticas:", error);
@@ -108,7 +145,7 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
   useEffect(() => {
     fetchStats();
     if (intervalRef.current) clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(fetchStats, 120000); // 2 minutos
+    intervalRef.current = setInterval(fetchStats, 300000); // 5 minutos (reduzido para evitar rate limits)
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
@@ -129,6 +166,46 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
     };
   }, [stats]);
 
+  // Garantir que maxValue nunca seja zero para evitar divisão por zero
+  const maxValue = Math.max(...activity.map(a => a.value), 1);
+  const maxBarHeight = 100; // px
+
+  // Preparar dados para o Nivo (sanitizando datas)
+  const nivoData = activity
+    .map(item => {
+      let label = '';
+      if (period === '24h') {
+        const d = new Date(item.date + ':00:00Z');
+        label = isNaN(d.getTime())
+          ? 'Inválido'
+          : d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }) + 'h';
+      } else {
+        const d = new Date(item.date);
+        label = isNaN(d.getTime())
+          ? 'Inválido'
+          : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      }
+      return {
+        data: item.value,
+        label,
+      };
+    })
+    .filter(item => item.label !== 'Inválido');
+
+  // Tema Nivo para dark/light mode
+  const nivoTheme = {
+    textColor: '#fff',
+    axis: {
+      domain: { line: { stroke: '#888', strokeWidth: 1 } },
+      legend: { text: { fill: '#aaa' } },
+      ticks: {
+        line: { stroke: '#888', strokeWidth: 1 },
+        text: { fill: '#aaa' }
+      }
+    },
+    grid: { line: { stroke: '#444', strokeWidth: 1 } }
+  };
+
   if (!address) {
     return <div className="text-center text-gray-500">Conecte sua carteira para ver o dashboard.</div>;
   }
@@ -138,6 +215,13 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
 
   return (
     <div className="w-full bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-6 rounded-2xl shadow-lg">
+      {/* Forçar Tailwind a incluir todas as variantes de gradiente */}
+      <div className="hidden
+        bg-gradient-to-t from-blue-500 to-blue-300
+        dark:from-blue-600 dark:to-blue-400
+        bg-gradient-to-tl from-blue-500 to-blue-300
+        bg-gradient-to-tr from-blue-500 to-blue-300
+      " />
       {error && <div className="text-red-500 text-center mb-4">{error}</div>}
       <div className="flex items-center gap-3 mb-6">
         <Image src="/ercdToken.png" alt="ECRD" width={32} height={32} />
@@ -147,10 +231,10 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
           <select
             className="px-2 py-1 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs"
             value={period}
-            onChange={e => setPeriod(Number(e.target.value))}
+            onChange={e => setPeriod(e.target.value as '24h' | '7d' | '30d')}
           >
             {PERIOD_OPTIONS.map(opt => (
-              <option key={opt} value={opt}>{opt} dias</option>
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
         </div>
@@ -228,30 +312,61 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
       {/* Gráfico de Atividade Real */}
       <div className="mt-6 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">Atividade Recente</div>
-          <span className="text-xs text-gray-500">{period} dias</span>
+          <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            Atividade {period === '24h' ? 'nas últimas 24h' : period === '7d' ? 'nos últimos 7 dias' : 'no último mês'}
+          </div>
+          <span className="text-xs text-gray-500">
+            {period === '24h' ? '24h' : period === '7d' ? '7 dias' : '1 mês'}
+          </span>
         </div>
-        <div className="flex items-end gap-1 h-24 md:h-32 lg:h-40">
-          {activity.map((item, i) => (
-            <div
-              key={item.date}
-              className="flex-1 group relative cursor-pointer"
-              style={{ minWidth: 6 }}
-            >
-              <div
-                className={`bg-gradient-to-t from-blue-500 to-blue-300 dark:from-blue-600 dark:to-blue-400 rounded-t transition-all duration-500`}
-                style={{ height: `${Math.max(10, (item.value / Math.max(...activity.map(a => a.value), 1)) * 100)}%` }}
-              />
-              {/* Tooltip */}
-              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 rounded bg-gray-800 text-white text-xs opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap shadow-lg">
-                {item.date}: {item.value.toFixed(2)} ECRD
-              </div>
-            </div>
-          ))}
+        <div style={{ overflowX: 'auto' }}>
+          <div style={{ height: 300, minWidth: period === '24h' ? 700 : undefined }}>
+            <ResponsiveBar
+              data={nivoData}
+              keys={['data']}
+              indexBy="label"
+              margin={{ top: 20, right: 30, bottom: 40, left: 50 }}
+              padding={0.3}
+              colors={() => barColor}
+              theme={nivoTheme}
+              axisBottom={{
+                tickRotation: period === '30d' ? 45 : period === '24h' ? 45 : 0,
+                tickValues: period === '24h'
+                  ? nivoData.filter((_, i) => i % 3 === 0 || i === nivoData.length - 1).map(d => d.label)
+                  : period === '30d'
+                    ? nivoData.filter((_, i) => i % 5 === 0 || i === nivoData.length - 1).map(d => d.label)
+                    : undefined
+              }}
+              axisLeft={{
+                legend: 'ECRD',
+                legendPosition: 'middle',
+                legendOffset: -40
+              }}
+              tooltip={({ indexValue, value }: { indexValue: string | number, value: number }) => (
+                <div style={{ padding: 8, background: '#222', color: '#fff', borderRadius: 4 }}>
+                  <strong>{indexValue}</strong><br />
+                  {value} ECRD
+                </div>
+              )}
+              enableLabel={false}
+              animate={true}
+              enableGridY={true}
+              borderRadius={2}
+            />
+          </div>
         </div>
         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
-          <span>{activity[0]?.date || ""}</span>
-          <span>{activity[activity.length - 1]?.date || ""}</span>
+          {period === '24h' ? (
+            <>
+              <span>{activity[0] ? new Date(activity[0].date + ':00:00Z').toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }) + 'h' : ""}</span>
+              <span>{activity[activity.length - 1] ? new Date(activity[activity.length - 1].date + ':00:00Z').toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }) + 'h' : ""}</span>
+            </>
+          ) : (
+            <>
+              <span>{activity[0] ? new Date(activity[0].date).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' }) : ""}</span>
+              <span>{activity[activity.length - 1] ? new Date(activity[activity.length - 1].date).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' }) : ""}</span>
+            </>
+          )}
         </div>
       </div>
 

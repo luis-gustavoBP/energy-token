@@ -11,10 +11,14 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@nivo/bar": "^0.99.0",
+    "@nivo/core": "^0.99.0",
     "@openzeppelin/contracts": "^5.3.0",
     "@truffle/hdwallet-provider": "^1.7.0",
+    "alchemy-sdk": "^3.6.1",
     "dotenv": "^17.2.0",
-    "ethers": "^6.15.0"
+    "ethers": "^6.15.0",
+    "next-themes": "^0.4.6"
   },
   "devDependencies": {
     "@types/estree": "^1.0.8",

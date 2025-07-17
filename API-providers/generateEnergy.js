@@ -2,10 +2,10 @@
 require('dotenv').config();
 const { ethers } = require("ethers");
 
-const INFURA_PROJECT_ID = process.env.INFURA_PROJECT_ID;
+const ALCHEMY_PROJECT_ID = process.env.ALCHEMY_PROJECT_ID;
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
-const provider = new ethers.JsonRpcProvider(`https://sepolia.infura.io/v3/${INFURA_PROJECT_ID}`);
+const provider = new ethers.JsonRpcProvider(`https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_PROJECT_ID}`);
 const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
 const CONTRACT_ABI = require("../build/contracts/EnergyCredits.json").abi;

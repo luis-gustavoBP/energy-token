@@ -11,8 +11,8 @@ export default function Balance({ address, contract, onBalanceChange }: { addres
   const fetchBalance = useCallback(async () => {
     if (!address || !contract) return;
     setLoading(true);
-    try {
-      const bal = await contract.balanceOf(address);
+      try {
+        const bal = await contract.balanceOf(address);
       const formattedBalance = ethers.formatUnits(bal, 18);
       setBalance(formattedBalance);
       if (onBalanceChange) onBalanceChange(formattedBalance);

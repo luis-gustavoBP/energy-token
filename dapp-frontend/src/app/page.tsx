@@ -19,6 +19,10 @@ import CONTRACT_ABI from "../../build/contracts/EnergyCredits.json";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 
+// Log para verificar o ABI
+console.log("HomeContent: ABI carregado:", CONTRACT_ABI.abi ? "Sim" : "Não");
+console.log("HomeContent: burnEnergy no ABI:", CONTRACT_ABI.abi?.some((item: any) => item.name === 'burnEnergy'));
+
 function HomeContent() {
   const [address, setAddress] = useState<string>("");
   const [contract, setContract] = useState<EnergyCreditsContract | null>(null);
@@ -26,8 +30,8 @@ function HomeContent() {
   const [ownerAddress, setOwnerAddress] = useState<string>("");
   const [balance, setBalance] = useState<string>("-");
 
-  // Instancia provider de leitura (Infura)
-  const provider = new ethers.JsonRpcProvider(`https://sepolia.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_PROJECT_ID}`);
+  // Instancia provider de leitura (Alchemy)
+  const provider = new ethers.JsonRpcProvider(`https://eth-sepolia.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_PROJECT_ID}`);
 
   // Instancia contrato para leitura usando useMemo para evitar recriação
   const contractRead = useMemo(() => {
@@ -37,17 +41,29 @@ function HomeContent() {
   // Atualiza contrato de escrita ao conectar carteira
   const handleConnect = useCallback(async (userAddress: string) => {
     setAddress(userAddress);
+    console.log("HomeContent: Conectando carteira:", userAddress);
+    
     if (userAddress && (window as any).ethereum) {
       const web3Provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await web3Provider.getSigner();
       const contractWrite = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI.abi, signer) as EnergyCreditsContract;
       setContract(contractWrite);
+      
       // Descobre owner
       try {
+        console.log("HomeContent: Verificando owner do contrato...");
         const owner = await contractWrite.owner();
+        console.log("HomeContent: Owner do contrato:", owner);
+        console.log("HomeContent: Endereço do usuário:", userAddress);
+        console.log("HomeContent: Comparando endereços...");
+        
+        const isUserOwner = owner.toLowerCase() === userAddress.toLowerCase();
+        console.log("HomeContent: isOwner =", isUserOwner);
+        
         setOwnerAddress(owner);
-        setIsOwner(owner.toLowerCase() === userAddress.toLowerCase());
-      } catch {
+        setIsOwner(isUserOwner);
+      } catch (error) {
+        console.error("HomeContent: Erro ao verificar owner:", error);
         setIsOwner(false);
       }
     } else {
@@ -99,8 +115,8 @@ function HomeContent() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <SmartTransferForm contract={contract} address={address} balance={balance} />
             <div className="space-y-6">
-              <GenerateForm contract={contract} address={address} isOwner={isOwner} />
-              <BurnForm contract={contract} address={address} isOwner={isOwner} />
+          <GenerateForm contract={contract} address={address} isOwner={isOwner} />
+          {isOwner && <BurnForm contract={contract} address={address} isOwner={isOwner} />}
             </div>
           </div>
           <GenerationHistory contract={contract} isOwner={isOwner} address={address} />

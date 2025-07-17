@@ -68,7 +68,7 @@ export default function NetworkCheck({ onNetworkChange }: NetworkCheckProps) {
                   symbol: "SEP",
                   decimals: 18,
                 },
-                rpcUrls: ["https://sepolia.infura.io/v3/"],
+                rpcUrls: ["https://eth-sepolia.g.alchemy.com/v2/"],
                 blockExplorerUrls: ["https://sepolia.etherscan.io/"],
               }],
             });

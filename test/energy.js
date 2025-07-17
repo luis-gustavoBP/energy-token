@@ -3,7 +3,7 @@ require('dotenv').config(); // Importa as variáveis do .env
 const { ethers } = require("ethers");
 
 // Configurações
-const providerUrl = `https://sepolia.infura.io/v3/${process.env.INFURA_PROJECT_ID}`; // URL Infura completa
+const providerUrl = `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_PROJECT_ID}`; // URL Alchemy completa
 const privateKey = process.env.PRIVATE_KEY; // Chave privada da sua conta MetaMask
 
 const contractABI = require('../build/contracts/EnergyCredits.json').abi;

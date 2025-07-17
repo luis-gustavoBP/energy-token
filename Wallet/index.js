@@ -1,7 +1,7 @@
 const { ethers } = require("ethers");
 require('dotenv').config();
 
-const provider = new ethers.JsonRpcProvider(`https://sepolia.infura.io/v3/${process.env.INFURA_PROJECT_ID}`);
+const provider = new ethers.JsonRpcProvider(`https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_PROJECT_ID}`);
 const ownerWallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider); // PRIVATE_KEY do owner
 
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
