@@ -29,6 +29,11 @@ function HomeContent() {
   const [isOwner, setIsOwner] = useState(false);
   const [ownerAddress, setOwnerAddress] = useState<string>("");
   const [balance, setBalance] = useState<string>("-");
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Instancia provider de leitura (Alchemy)
   const provider = new ethers.JsonRpcProvider(`https://eth-sepolia.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_PROJECT_ID}`);
@@ -134,7 +139,7 @@ function HomeContent() {
           </div>
         </div>
       )}
-      <div className="text-xs text-center text-gray-400 mt-8">Contrato: <span className="font-mono">{CONTRACT_ADDRESS}</span><br/>Owner: <span className="font-mono">{ownerAddress}</span></div>
+      <div className="text-xs text-center text-gray-400 mt-8">Contrato: <span className="font-mono">{CONTRACT_ADDRESS}</span><br/>Owner: <span className="font-mono">{isClient ? ownerAddress : ""}</span></div>
     </div>
   );
 }

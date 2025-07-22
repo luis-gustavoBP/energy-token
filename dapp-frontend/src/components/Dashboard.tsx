@@ -6,6 +6,13 @@ import Image from "next/image";
 import { ResponsiveBar } from '@nivo/bar';
 import { useTheme } from 'next-themes';
 
+interface EnergyEvent {
+  type: 'generated' | 'burned';
+  user: string;
+  amount: number;
+  timestamp: number;
+}
+
 interface DashboardProps {
   contract: EnergyCreditsContract;
   address: string;
@@ -42,6 +49,7 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
   const [period, setPeriod] = useState<'24h' | '7d' | '30d'>('24h');
   const [activity, setActivity] = useState<DailyActivity[]>([]);
   const [error, setError] = useState<string>("");
+  const [energyEvents, setEnergyEvents] = useState<EnergyEvent[]>([]);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const { resolvedTheme } = useTheme();
   const barColor = resolvedTheme === 'dark' ? '#4ade80' : '#16a34a';
@@ -141,9 +149,39 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
     }
   };
 
+  // Buscar eventos EnergyGenerated e EnergyBurned
+  const fetchEnergyEvents = async () => {
+    if (!contract) return;
+    try {
+      const maxBlocks = 2000;
+      const filterGen = contract.filters.EnergyGenerated();
+      const filterBurn = contract.filters.EnergyBurned();
+      const [genEvents, burnEvents] = await Promise.all([
+        contract.queryFilter(filterGen, -maxBlocks),
+        contract.queryFilter(filterBurn, -maxBlocks),
+      ]);
+      const parsedGen = genEvents.map(e => ({
+        type: 'generated',
+        user: e.args[0],
+        amount: Number(ethers.formatUnits(e.args[1], 18)),
+        timestamp: Number(e.args[2])
+      }));
+      const parsedBurn = burnEvents.map(e => ({
+        type: 'burned',
+        user: e.args[0],
+        amount: Number(ethers.formatUnits(e.args[1], 18)),
+        timestamp: Number(e.args[2])
+      }));
+      setEnergyEvents([...parsedGen, ...parsedBurn].sort((a, b) => b.timestamp - a.timestamp));
+    } catch (err) {
+      // Silenciar erro
+    }
+  };
+
   // Atualização automática
   useEffect(() => {
     fetchStats();
+    fetchEnergyEvents();
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(fetchStats, 300000); // 5 minutos (reduzido para evitar rate limits)
     return () => {
@@ -171,26 +209,49 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
   const maxBarHeight = 100; // px
 
   // Preparar dados para o Nivo (sanitizando datas)
-  const nivoData = activity
-    .map(item => {
+  // Novo: preparar dados separados para geração e queima
+  const nivoData = (() => {
+    // Map: label -> { generated, burned }
+    const map: Record<string, { generated: number, burned: number }> = {};
+    // Preencher datas possíveis
+    if (period === '24h') {
+      for (let i = 0; i < 24; i++) {
+        const d = new Date();
+        d.setHours(d.getHours() - (23 - i), 0, 0, 0);
+        const brDate = new Date(d.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+        const key = brDate.toISOString().slice(0, 13); // yyyy-mm-ddTHH
+        let label = brDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }) + 'h';
+        map[label] = { generated: 0, burned: 0 };
+      }
+    } else {
+      const days = period === '7d' ? 7 : 30;
+      for (let i = 0; i < days; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - (days - 1 - i));
+        d.setHours(0, 0, 0, 0);
+        const brDate = new Date(d.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+        const key = brDate.toISOString().slice(0, 10); // yyyy-mm-dd
+        let label = brDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        map[label] = { generated: 0, burned: 0 };
+      }
+    }
+    // Preencher com eventos
+    for (const ev of energyEvents) {
+      let d = new Date(ev.timestamp * 1000);
+      d = new Date(d.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
       let label = '';
       if (period === '24h') {
-        const d = new Date(item.date + ':00:00Z');
-        label = isNaN(d.getTime())
-          ? 'Inválido'
-          : d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }) + 'h';
+        label = d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }) + 'h';
       } else {
-        const d = new Date(item.date);
-        label = isNaN(d.getTime())
-          ? 'Inválido'
-          : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        label = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
       }
-      return {
-        data: item.value,
-        label,
-      };
-    })
-    .filter(item => item.label !== 'Inválido');
+      if (!map[label]) map[label] = { generated: 0, burned: 0 };
+      if (ev.type === 'generated') map[label].generated += ev.amount;
+      if (ev.type === 'burned') map[label].burned += ev.amount;
+    }
+    // Converter para array
+    return Object.entries(map).map(([label, { generated, burned }]) => ({ label, generated, burned }));
+  })();
 
   // Tema Nivo para dark/light mode
   const nivoTheme = {
@@ -323,11 +384,11 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
           <div style={{ height: 300, minWidth: period === '24h' ? 700 : undefined }}>
             <ResponsiveBar
               data={nivoData}
-              keys={['data']}
+              keys={['generated', 'burned']}
               indexBy="label"
               margin={{ top: 20, right: 30, bottom: 40, left: 50 }}
               padding={0.3}
-              colors={() => barColor}
+              colors={({ id }) => id === 'burned' ? '#dc2626' : '#16a34a'}
               theme={nivoTheme}
               axisBottom={{
                 tickRotation: period === '30d' ? 45 : period === '24h' ? 45 : 0,
@@ -342,16 +403,17 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
                 legendPosition: 'middle',
                 legendOffset: -40
               }}
-              tooltip={({ indexValue, value }: { indexValue: string | number, value: number }) => (
+              tooltip={({ indexValue, value, id }: { indexValue: string | number, value: number, id: string }) => (
                 <div style={{ padding: 8, background: '#222', color: '#fff', borderRadius: 4 }}>
                   <strong>{indexValue}</strong><br />
-                  {value} ECRD
+                  {id === 'burned' ? '-' : '+'}{value} ECRD
                 </div>
               )}
               enableLabel={false}
               animate={true}
               enableGridY={true}
               borderRadius={2}
+              groupMode="stacked"
             />
           </div>
         </div>
@@ -383,6 +445,22 @@ export default function Dashboard({ contract, address, balance }: DashboardProps
           <div className="text-lg font-semibold text-green-600 dark:text-green-400">
             {stats.totalReceived} ECRD
           </div>
+        </div>
+      </div>
+
+      {/* Histórico de Geração e Queima */}
+      <div className="mt-6">
+        <div className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">Histórico de Geração e Queima</div>
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {energyEvents.length === 0 && <div className="text-xs text-gray-500">Nenhum evento encontrado.</div>}
+          {energyEvents.map((ev, i) => (
+            <div key={i} className={`flex items-center gap-2 text-xs p-2 rounded-lg border ${ev.type === 'burned' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300' : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300'}`}>
+              <span className="font-mono">{ev.user.slice(0, 6)}...{ev.user.slice(-4)}</span>
+              <span className="font-bold">{ev.type === 'burned' ? '-' : '+'}{ev.amount} ECRD</span>
+              <span className="ml-auto">{new Date(ev.timestamp * 1000).toLocaleString('pt-BR')}</span>
+              <span className="ml-2 px-2 py-0.5 rounded text-xs font-semibold uppercase" style={{ background: ev.type === 'burned' ? '#fee2e2' : '#bbf7d0', color: ev.type === 'burned' ? '#b91c1c' : '#166534' }}>{ev.type === 'burned' ? 'Queima' : 'Geração'}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
