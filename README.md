@@ -27,7 +27,7 @@ Uma aplicação descentralizada (DApp) moderna para gerenciamento de créditos d
 - **Ownable** - Controle de acesso baseado em ownership
 
 ### Infraestrutura
-- **Infura** - Provider para rede Sepolia
+- **Alchemy** - Provider para rede Sepolia
 - **MetaMask** - Carteira Ethereum para usuários
 - **Truffle** - Framework de desenvolvimento e deploy
 
